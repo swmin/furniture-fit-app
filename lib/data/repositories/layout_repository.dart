@@ -87,6 +87,21 @@ class LayoutRepository {
     await _touchLayout(item.layoutId);
   }
 
+  /// 실행취소/다시실행을 위해 배치안의 가구 목록 전체를 주어진 스냅샷으로 교체한다.
+  Future<void> replaceItems(String layoutId, List<LayoutItem> snapshot) async {
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.layoutItems,
+      )..where((t) => t.layoutId.equals(layoutId))).go();
+      await _db.batch((b) {
+        for (final it in snapshot) {
+          b.insert(_db.layoutItems, it);
+        }
+      });
+    });
+    await _touchLayout(layoutId);
+  }
+
   /// 오른쪽 아래로 살짝 비켜서 복제한다.
   Future<String> duplicateItem(LayoutItem item) => addItem(
     layoutId: item.layoutId,

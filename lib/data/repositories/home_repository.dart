@@ -161,6 +161,72 @@ class HomeRepository {
   Future<String> createLayout(String homeId, String name) =>
       _insertLayout(homeId, name, DateTime.now());
 
+  /// 배치안 이름 변경.
+  Future<void> renameLayout(String layoutId, String name) async {
+    final now = DateTime.now();
+    await (_db.update(_db.layouts)..where((t) => t.id.equals(layoutId))).write(
+      LayoutsCompanion(name: Value(name), updatedAt: Value(now)),
+    );
+  }
+
+  /// 배치안과 그 안의 모든 가구를 복제해 새 배치안을 만든다.
+  Future<String> duplicateLayout(String sourceLayoutId, String newName) {
+    return _db.transaction(() async {
+      final src = await (_db.select(
+        _db.layouts,
+      )..where((t) => t.id.equals(sourceLayoutId))).getSingle();
+      final now = DateTime.now();
+      final newLayoutId = await _insertLayout(src.homeId, newName, now);
+      final items = await (_db.select(
+        _db.layoutItems,
+      )..where((t) => t.layoutId.equals(sourceLayoutId))).get();
+      await _db.batch((b) {
+        for (final it in items) {
+          b.insert(
+            _db.layoutItems,
+            LayoutItemsCompanion.insert(
+              id: _uuid.v4(),
+              layoutId: newLayoutId,
+              furnitureId: Value(it.furnitureId),
+              name: it.name,
+              widthMm: it.widthMm,
+              depthMm: it.depthMm,
+              heightMm: Value(it.heightMm),
+              xMm: it.xMm,
+              yMm: it.yMm,
+              rotationDeg: Value(it.rotationDeg),
+              colorValue: it.colorValue,
+              doorType: Value(it.doorType),
+              doorSwingMm: Value(it.doorSwingMm),
+              zIndex: Value(it.zIndex),
+            ),
+          );
+        }
+      });
+      await (_db.update(_db.homes)..where((t) => t.id.equals(src.homeId)))
+          .write(HomesCompanion(updatedAt: Value(now)));
+      return newLayoutId;
+    });
+  }
+
+  /// 배치안을 삭제한다. 집에 배치안이 1개뿐이면 [StateError].
+  Future<void> deleteLayout(String layoutId) async {
+    final target = await (_db.select(
+      _db.layouts,
+    )..where((t) => t.id.equals(layoutId))).getSingleOrNull();
+    if (target == null) return;
+    final countExp = _db.layouts.id.count();
+    final row =
+        await (_db.selectOnly(_db.layouts)
+              ..addColumns([countExp])
+              ..where(_db.layouts.homeId.equals(target.homeId)))
+            .getSingle();
+    if ((row.read(countExp) ?? 0) <= 1) {
+      throw StateError('최소 1개의 배치안은 남겨 두어야 합니다.');
+    }
+    await (_db.delete(_db.layouts)..where((t) => t.id.equals(layoutId))).go();
+  }
+
   Future<String> _insertLayout(String homeId, String name, DateTime now) async {
     final id = _uuid.v4();
     await _db

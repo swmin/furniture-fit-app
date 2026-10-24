@@ -7,6 +7,7 @@ import '../data/repositories/furniture_library_repository.dart';
 import '../data/repositories/home_repository.dart';
 import '../data/repositories/layout_repository.dart';
 import '../data/services/floor_plan_storage.dart';
+import '../data/services/purchase_service.dart';
 import '../domain/models/furniture_preset.dart';
 
 /// 의존성 주입 (Riverpod). 테스트에서는 [databaseProvider]를 override 한다.
@@ -65,13 +66,31 @@ final customFurnituresProvider = StreamProvider<List<CustomFurniture>>(
   (ref) => ref.watch(layoutRepositoryProvider).watchCustomFurnitures(),
 );
 
-/// Pro 구매 여부. Step 5(인앱 결제 연동)에서 실제 구매 상태로 교체 예정.
+final purchaseServiceProvider = Provider<PurchaseService>((ref) {
+  final svc = PurchaseService();
+  ref.onDispose(svc.dispose);
+  return svc;
+});
+
+/// Pro 구매 여부. 로컬 저장소(`SharedPreferences`)와 Google Play 결제 스트림을 동기화한다.
 class ProStatusNotifier extends Notifier<bool> {
   @override
-  bool build() => false;
+  bool build() {
+    final svc = ref.watch(purchaseServiceProvider);
+    svc.loadProStatus().then((saved) {
+      if (saved && !state) state = true;
+    });
+    svc.listen((unlocked) {
+      if (unlocked) state = true;
+    });
+    return false;
+  }
 
-  /// 개발용 토글 (디버그 빌드 설정 화면에서만 노출).
-  void debugSet(bool value) => state = value;
+  /// 개발용 토글 (디버그 빌드 설정 화면에서만 노출) 및 영구 저장.
+  Future<void> debugSet(bool value) async {
+    state = value;
+    await ref.read(purchaseServiceProvider).saveProStatus(value);
+  }
 }
 
 final proStatusProvider = NotifierProvider<ProStatusNotifier, bool>(

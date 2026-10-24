@@ -8,6 +8,7 @@ import '../../../core/providers.dart';
 import '../../../core/units.dart';
 import '../../../data/repositories/home_repository.dart';
 import '../pro/paywall_sheet.dart';
+import '../../widgets/ad_banner_bar.dart';
 import 'create_home_sheet.dart';
 
 /// 홈: 내 집 목록.
@@ -51,7 +52,7 @@ class HomeScreen extends ConsumerWidget {
         icon: const Icon(Icons.add_home_outlined),
         label: const Text('새 집 만들기'),
       ),
-      // TODO(step5): 무료 사용자 하단 배너 광고 영역
+      bottomNavigationBar: const AdBannerBar(),
     );
   }
 

@@ -30,10 +30,15 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.restore),
             title: const Text('구매 복원'),
-            // TODO(step5): in_app_purchase restorePurchases()
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('결제 기능은 출시 전 연동 예정입니다.')),
-            ),
+            onTap: () async {
+              final msg = await ref
+                  .read(purchaseServiceProvider)
+                  .restorePurchases();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(msg)));
+            },
           ),
           const Divider(),
           const ListTile(

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/units.dart';
 import '../../../domain/models/furniture_preset.dart';
+import '../../widgets/ad_banner_bar.dart';
 
 /// 기본 가구·가전 라이브러리 둘러보기.
 class LibraryScreen extends ConsumerStatefulWidget {
@@ -23,6 +24,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('가구 라이브러리')),
+      bottomNavigationBar: const AdBannerBar(),
       body: presets.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('라이브러리 로드 실패: $e')),
