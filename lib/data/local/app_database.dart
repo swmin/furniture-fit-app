@@ -10,8 +10,12 @@ class Homes extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withLength(min: 1, max: 60)();
 
-  /// 앱 내부 저장소에 복사된 도면 이미지 경로 (빈 방이면 null).
+  /// 앱 내부 저장소(문서 폴더) 기준 도면 이미지 상대 경로 (빈 방이면 null).
   TextColumn get floorPlanPath => text().nullable()();
+
+  /// 도면 이미지 픽셀 크기 (schema v2).
+  IntColumn get floorPlanWidthPx => integer().nullable()();
+  IntColumn get floorPlanHeightPx => integer().nullable()();
 
   /// 축척 보정 결과: 도면 이미지 1px 당 실제 mm.
   RealColumn get mmPerPixel => real().nullable()();
@@ -91,15 +95,22 @@ class CustomFurnitures extends Table {
 @DriftDatabase(tables: [Homes, Layouts, LayoutItems, CustomFurnitures])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
-      : super(executor ?? driftDatabase(name: 'furniturefit'));
+    : super(executor ?? driftDatabase(name: 'furniturefit'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        beforeOpen: (details) async {
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(homes, homes.floorPlanWidthPx);
+        await m.addColumn(homes, homes.floorPlanHeightPx);
+      }
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+  );
 }

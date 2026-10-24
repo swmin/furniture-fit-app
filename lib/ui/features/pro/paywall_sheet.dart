@@ -6,7 +6,8 @@ import '../../../core/constants.dart';
 enum PaywallReason {
   homeLimit('무료 버전은 집을 ${AppConstants.freeHomeLimit}개까지 만들 수 있어요.'),
   customFurnitureLimit(
-      '무료 버전은 내 가구를 ${AppConstants.freeCustomFurnitureLimit}개까지 저장할 수 있어요.'),
+    '무료 버전은 내 가구를 ${AppConstants.freeCustomFurnitureLimit}개까지 저장할 수 있어요.',
+  ),
   hdExport('워터마크 없는 고화질 내보내기는 Pro 기능이에요.'),
   general('');
 
@@ -14,14 +15,15 @@ enum PaywallReason {
   final String message;
 }
 
-Future<void> showPaywallSheet(BuildContext context,
-        {PaywallReason reason = PaywallReason.general}) =>
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => _PaywallSheet(reason: reason),
-    );
+Future<void> showPaywallSheet(
+  BuildContext context, {
+  PaywallReason reason = PaywallReason.general,
+}) => showModalBottomSheet<void>(
+  context: context,
+  showDragHandle: true,
+  isScrollControlled: true,
+  builder: (_) => _PaywallSheet(reason: reason),
+);
 
 class _PaywallSheet extends StatelessWidget {
   const _PaywallSheet({required this.reason});
@@ -44,14 +46,18 @@ class _PaywallSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('${AppConstants.appName} Pro',
-              style: theme.textTheme.headlineSmall,
-              textAlign: TextAlign.center),
+          Text(
+            '${AppConstants.appName} Pro',
+            style: theme.textTheme.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
           if (reason.message.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(reason.message,
-                style: theme.textTheme.bodyMedium,
-                textAlign: TextAlign.center),
+            Text(
+              reason.message,
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
           ],
           const SizedBox(height: 16),
           for (final (icon, title, desc) in benefits)
@@ -62,8 +68,11 @@ class _PaywallSheet extends StatelessWidget {
               dense: true,
             ),
           const SizedBox(height: 8),
-          Text('배치안은 무료에서도 무제한이에요.',
-              style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+          Text(
+            '배치안은 무료에서도 무제한이에요.',
+            style: theme.textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 16),
           FilledButton(
             // TODO(step5): in_app_purchase 연동
@@ -73,8 +82,7 @@ class _PaywallSheet extends StatelessWidget {
                 const SnackBar(content: Text('결제 기능은 출시 전 연동 예정입니다.')),
               );
             },
-            child: const Text(
-                '${AppConstants.proPriceLabel} · 한 번 결제로 평생 사용'),
+            child: const Text('${AppConstants.proPriceLabel} · 한 번 결제로 평생 사용'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),

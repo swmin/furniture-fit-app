@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/units.dart';
 import '../../../data/local/app_database.dart';
+import '../../../domain/models/calibration.dart';
 
 /// 배치 편집 화면.
 ///
@@ -39,12 +41,22 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         final layoutList = layouts.value ?? const <Layout>[];
         final selected = layoutList.isEmpty
             ? null
-            : layoutList.firstWhere((l) => l.id == _selectedLayoutId,
-                orElse: () => layoutList.first);
+            : layoutList.firstWhere(
+                (l) => l.id == _selectedLayoutId,
+                orElse: () => layoutList.first,
+              );
 
         return Scaffold(
           appBar: AppBar(
             title: Text(h.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            actions: [
+              if (h.floorPlanPath != null)
+                IconButton(
+                  tooltip: '축척 다시 맞추기',
+                  icon: const Icon(Icons.straighten),
+                  onPressed: () => context.push('/homes/${h.id}/calibrate'),
+                ),
+            ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(52),
               child: _LayoutBar(
@@ -55,14 +67,15 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               ),
             ),
           ),
-          body: _RoomCanvas(home: h),
+          body: h.floorPlanPath != null
+              ? _FloorPlanCanvas(home: h)
+              : _RoomCanvas(home: h),
           bottomNavigationBar: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: FilledButton.tonalIcon(
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('가구 배치 기능은 Step 3에서 추가됩니다.')),
+                  const SnackBar(content: Text('가구 배치 기능은 Step 3에서 추가됩니다.')),
                 ),
                 icon: const Icon(Icons.add),
                 label: const Text('가구 추가'),
@@ -176,6 +189,165 @@ class _RoomCanvas extends StatelessWidget {
   }
 }
 
+/// 도면 이미지를 배경으로 그리고, 축척이 맞춰졌으면 1m 스케일 바와 기준선을 표시한다.
+class _FloorPlanCanvas extends ConsumerWidget {
+  const _FloorPlanCanvas({required this.home});
+
+  final Home home;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final file = ref.watch(floorPlanFileProvider(home.floorPlanPath!)).value;
+    final imgW = home.floorPlanWidthPx?.toDouble();
+    final imgH = home.floorPlanHeightPx?.toDouble();
+    if (file == null || imgW == null || imgH == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final scheme = Theme.of(context).colorScheme;
+    final mmPerPixel = home.mmPerPixel;
+    final calibration = Calibration.tryParse(home.calibrationJson);
+
+    return Column(
+      children: [
+        if (mmPerPixel == null)
+          MaterialBanner(
+            backgroundColor: scheme.errorContainer,
+            content: const Text(
+              '축척이 아직 맞춰지지 않았어요. 가구를 정확히 배치하려면 먼저 축척을 맞춰 주세요.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => context.push('/homes/${home.id}/calibrate'),
+                child: const Text('축척 맞추기'),
+              ),
+            ],
+          ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const margin = 16.0;
+              // fit: 화면 px / 이미지 px
+              final fit = math.min(
+                (constraints.maxWidth - margin * 2) / imgW,
+                (constraints.maxHeight - margin * 2) / imgH,
+              );
+              final size = Size(imgW * fit, imgH * fit);
+              return InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 10,
+                boundaryMargin: const EdgeInsets.all(200),
+                child: Center(
+                  child: SizedBox.fromSize(
+                    size: size,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.file(
+                          file,
+                          fit: BoxFit.fill,
+                          filterQuality: FilterQuality.medium,
+                        ),
+                        if (mmPerPixel != null)
+                          CustomPaint(
+                            painter: FloorPlanOverlayPainter(
+                              screenPxPerMm: fit / mmPerPixel,
+                              calibrationP1: calibration == null
+                                  ? null
+                                  : calibration.p1 * fit,
+                              calibrationP2: calibration == null
+                                  ? null
+                                  : calibration.p2 * fit,
+                              color: scheme.primary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 도면 위 오버레이: 좌하단 1m 스케일 바 + 축척 기준선(점선 느낌의 반투명 선).
+class FloorPlanOverlayPainter extends CustomPainter {
+  FloorPlanOverlayPainter({
+    required this.screenPxPerMm,
+    required this.calibrationP1,
+    required this.calibrationP2,
+    required this.color,
+  });
+
+  final double screenPxPerMm;
+  final Offset? calibrationP1;
+  final Offset? calibrationP2;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (calibrationP1 != null && calibrationP2 != null) {
+      canvas.drawLine(
+        calibrationP1!,
+        calibrationP2!,
+        Paint()
+          ..color = color.withValues(alpha: 0.5)
+          ..strokeWidth = 2,
+      );
+    }
+
+    // 1m 스케일 바 (너무 짧거나 길면 0.5m / 2m로 조정).
+    var barMm = 1000.0;
+    if (barMm * screenPxPerMm < 40) barMm = 2000;
+    if (barMm * screenPxPerMm > size.width * 0.5) barMm = 500;
+    final barPx = barMm * screenPxPerMm;
+    final start = Offset(12, size.height - 14);
+    final end = start + Offset(barPx, 0);
+
+    final bg = Paint()..color = Colors.white.withValues(alpha: 0.85);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTRB(start.dx - 6, start.dy - 26, end.dx + 6, start.dy + 8),
+        const Radius.circular(6),
+      ),
+      bg,
+    );
+    final bar = Paint()
+      ..color = color
+      ..strokeWidth = 3;
+    canvas.drawLine(start, end, bar);
+    canvas.drawLine(
+      start - const Offset(0, 5),
+      start + const Offset(0, 5),
+      bar,
+    );
+    canvas.drawLine(end - const Offset(0, 5), end + const Offset(0, 5), bar);
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: formatLength(barMm),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset((start.dx + end.dx - tp.width) / 2, start.dy - 22));
+  }
+
+  @override
+  bool shouldRepaint(FloorPlanOverlayPainter old) =>
+      old.screenPxPerMm != screenPxPerMm ||
+      old.calibrationP1 != calibrationP1 ||
+      old.calibrationP2 != calibrationP2 ||
+      old.color != color;
+}
+
 /// 방 바닥·그리드(100mm/500mm)·벽·치수선을 그린다.
 class RoomPainter extends CustomPainter {
   RoomPainter({
@@ -201,7 +373,11 @@ class RoomPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final room = Rect.fromLTWH(
-        margin, margin, roomWidthMm * pxPerMm, roomDepthMm * pxPerMm);
+      margin,
+      margin,
+      roomWidthMm * pxPerMm,
+      roomDepthMm * pxPerMm,
+    );
 
     canvas.drawRect(room, Paint()..color = floorColor);
 
@@ -214,13 +390,19 @@ class RoomPainter extends CustomPainter {
       ..strokeWidth = 1;
     for (var x = 100; x < roomWidthMm; x += 100) {
       final dx = room.left + x * pxPerMm;
-      canvas.drawLine(Offset(dx, room.top), Offset(dx, room.bottom),
-          x % 500 == 0 ? bold : fine);
+      canvas.drawLine(
+        Offset(dx, room.top),
+        Offset(dx, room.bottom),
+        x % 500 == 0 ? bold : fine,
+      );
     }
     for (var y = 100; y < roomDepthMm; y += 100) {
       final dy = room.top + y * pxPerMm;
-      canvas.drawLine(Offset(room.left, dy), Offset(room.right, dy),
-          y % 500 == 0 ? bold : fine);
+      canvas.drawLine(
+        Offset(room.left, dy),
+        Offset(room.right, dy),
+        y % 500 == 0 ? bold : fine,
+      );
     }
 
     // 벽.
@@ -238,16 +420,34 @@ class RoomPainter extends CustomPainter {
       ..strokeWidth = 1;
     final topY = room.top - 24;
     canvas.drawLine(Offset(room.left, topY), Offset(room.right, topY), dim);
-    canvas.drawLine(Offset(room.left, topY - 6), Offset(room.left, topY + 6), dim);
     canvas.drawLine(
-        Offset(room.right, topY - 6), Offset(room.right, topY + 6), dim);
-    _label(canvas, formatLength(roomWidthMm), Offset(room.center.dx, topY - 12));
+      Offset(room.left, topY - 6),
+      Offset(room.left, topY + 6),
+      dim,
+    );
+    canvas.drawLine(
+      Offset(room.right, topY - 6),
+      Offset(room.right, topY + 6),
+      dim,
+    );
+    _label(
+      canvas,
+      formatLength(roomWidthMm),
+      Offset(room.center.dx, topY - 12),
+    );
 
     final leftX = room.left - 24;
     canvas.drawLine(Offset(leftX, room.top), Offset(leftX, room.bottom), dim);
-    canvas.drawLine(Offset(leftX - 6, room.top), Offset(leftX + 6, room.top), dim);
     canvas.drawLine(
-        Offset(leftX - 6, room.bottom), Offset(leftX + 6, room.bottom), dim);
+      Offset(leftX - 6, room.top),
+      Offset(leftX + 6, room.top),
+      dim,
+    );
+    canvas.drawLine(
+      Offset(leftX - 6, room.bottom),
+      Offset(leftX + 6, room.bottom),
+      dim,
+    );
     canvas.save();
     canvas.translate(leftX - 12, room.center.dy);
     canvas.rotate(-math.pi / 2);
@@ -260,7 +460,10 @@ class RoomPainter extends CustomPainter {
       text: TextSpan(
         text: text,
         style: TextStyle(
-            color: labelColor, fontSize: 12, fontWeight: FontWeight.w600),
+          color: labelColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();

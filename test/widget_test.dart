@@ -31,7 +31,10 @@ void main() {
 
     test('빈 방 집 생성 시 기본 배치안 1개가 함께 생성된다', () async {
       final id = await repo.createEmptyRoomHome(
-          name: '테스트 집', roomWidthMm: 3600, roomDepthMm: 4200);
+        name: '테스트 집',
+        roomWidthMm: 3600,
+        roomDepthMm: 4200,
+      );
 
       final summaries = await repo.watchHomeSummaries().first;
       expect(summaries, hasLength(1));
@@ -42,7 +45,10 @@ void main() {
 
     test('배치안 추가 및 집 삭제 시 cascade 삭제', () async {
       final id = await repo.createEmptyRoomHome(
-          name: '집', roomWidthMm: 3000, roomDepthMm: 3000);
+        name: '집',
+        roomWidthMm: 3000,
+        roomDepthMm: 3000,
+      );
       await repo.createLayout(id, '배치안 2');
       expect(await repo.watchLayouts(id).first, hasLength(2));
 

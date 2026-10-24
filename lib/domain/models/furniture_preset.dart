@@ -24,10 +24,8 @@ class DoorSpec {
   final String type;
   final int swingMm;
 
-  factory DoorSpec.fromJson(Map<String, dynamic> json) => DoorSpec(
-        type: json['type'] as String,
-        swingMm: json['swingMm'] as int,
-      );
+  factory DoorSpec.fromJson(Map<String, dynamic> json) =>
+      DoorSpec(type: json['type'] as String, swingMm: json['swingMm'] as int);
 }
 
 /// 기본 가구 라이브러리 프리셋 (assets/furniture_library.json).

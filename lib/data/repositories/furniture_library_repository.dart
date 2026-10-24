@@ -7,7 +7,7 @@ import '../../domain/models/furniture_preset.dart';
 /// 앱에 내장된 한국형 가구·가전 규격 라이브러리를 읽는다.
 class FurnitureLibraryRepository {
   FurnitureLibraryRepository({AssetBundle? bundle})
-      : _bundle = bundle ?? rootBundle;
+    : _bundle = bundle ?? rootBundle;
 
   static const assetPath = 'assets/furniture_library.json';
 

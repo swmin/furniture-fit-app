@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import 'ui/features/calibration/calibration_screen.dart';
 import 'ui/features/editor/editor_screen.dart';
 import 'ui/features/home/home_screen.dart';
 import 'ui/features/library/library_screen.dart';
@@ -15,6 +16,13 @@ final appRouter = GoRouter(
           path: 'homes/:homeId',
           builder: (context, state) =>
               EditorScreen(homeId: state.pathParameters['homeId']!),
+          routes: [
+            GoRoute(
+              path: 'calibrate',
+              builder: (context, state) =>
+                  CalibrationScreen(homeId: state.pathParameters['homeId']!),
+            ),
+          ],
         ),
         GoRoute(
           path: 'library',

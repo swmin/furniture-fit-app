@@ -14,13 +14,16 @@ String formatLength(num mm, {LengthUnit unit = LengthUnit.mm}) =>
     };
 
 /// 가구 치수 문자열. 예) "1,500 × 2,000mm"
-String formatSize(num widthMm, num depthMm, {LengthUnit unit = LengthUnit.mm}) =>
-    switch (unit) {
-      LengthUnit.mm =>
-        '${_thousands.format(widthMm.round())} × ${_thousands.format(depthMm.round())}mm',
-      LengthUnit.cm =>
-        '${_oneDecimal.format(widthMm / 10)} × ${_oneDecimal.format(depthMm / 10)}cm',
-    };
+String formatSize(
+  num widthMm,
+  num depthMm, {
+  LengthUnit unit = LengthUnit.mm,
+}) => switch (unit) {
+  LengthUnit.mm =>
+    '${_thousands.format(widthMm.round())} × ${_thousands.format(depthMm.round())}mm',
+  LengthUnit.cm =>
+    '${_oneDecimal.format(widthMm / 10)} × ${_oneDecimal.format(depthMm / 10)}cm',
+};
 
 /// 면적 (m²). 예) 3600×4200 → "15.1m²"
 String formatArea(num widthMm, num depthMm) =>

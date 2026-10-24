@@ -49,7 +49,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 height: 56,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   children: [
                     _chip(null, '전체'),
                     for (final c in FurnitureCategory.values) _chip(c, c.label),
@@ -70,13 +73,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   Widget _chip(FurnitureCategory? c, String label) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: ChoiceChip(
-          label: Text(label),
-          selected: _category == c,
-          onSelected: (_) => setState(() => _category = c),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: ChoiceChip(
+      label: Text(label),
+      selected: _category == c,
+      onSelected: (_) => setState(() => _category = c),
+    ),
+  );
 }
 
 class _PresetTile extends StatelessWidget {
@@ -110,13 +113,17 @@ class _PresetTile extends StatelessWidget {
         ),
       ),
       title: Text(p.name),
-      subtitle: Text([
-        formatSize(p.widthMm, p.depthMm),
-        if (p.heightMm != null) '높이 ${formatLength(p.heightMm!)}',
-        if (p.door != null) '문 반경 ${formatLength(p.door!.swingMm)}',
-      ].join(' · ')),
-      trailing: Text(p.category.label,
-          style: Theme.of(context).textTheme.labelSmall),
+      subtitle: Text(
+        [
+          formatSize(p.widthMm, p.depthMm),
+          if (p.heightMm != null) '높이 ${formatLength(p.heightMm!)}',
+          if (p.door != null) '문 반경 ${formatLength(p.door!.swingMm)}',
+        ].join(' · '),
+      ),
+      trailing: Text(
+        p.category.label,
+        style: Theme.of(context).textTheme.labelSmall,
+      ),
     );
   }
 }

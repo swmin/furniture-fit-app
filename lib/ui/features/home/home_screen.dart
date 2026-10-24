@@ -64,9 +64,12 @@ class HomeScreen extends ConsumerWidget {
       await showPaywallSheet(context, reason: PaywallReason.homeLimit);
       return;
     }
-    final homeId = await showCreateHomeSheet(context);
-    if (homeId != null && context.mounted) {
-      context.push('/homes/$homeId');
+    final result = await showCreateHomeSheet(context);
+    if (result != null && context.mounted) {
+      context.push('/homes/${result.homeId}');
+      if (result.needsCalibration) {
+        context.push('/homes/${result.homeId}/calibrate');
+      }
     }
   }
 }
@@ -83,16 +86,23 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.weekend_outlined,
-                size: 72, color: theme.colorScheme.primary),
+            Icon(
+              Icons.weekend_outlined,
+              size: 72,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 16),
-            Text('이 가구, 우리 집에 들어갈까?',
-                style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
+            Text(
+              '이 가구, 우리 집에 들어갈까?',
+              style: theme.textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
             Text(
               '도면 사진이나 방 크기로 집을 만들고\n가구를 mm 단위로 미리 배치해 보세요.',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -142,16 +152,19 @@ class _HomeCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(home.name,
-                        style: theme.textTheme.titleMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    Text(
+                      home.name,
+                      style: theme.textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 4),
                     Text(subtitle, style: theme.textTheme.bodySmall),
                     Text(
                       '수정 ${DateFormat('yyyy.MM.dd HH:mm').format(home.updatedAt)}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant),
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -159,7 +172,10 @@ class _HomeCard extends ConsumerWidget {
               PopupMenuButton<_HomeAction>(
                 onSelected: (a) => _onAction(context, ref, a),
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: _HomeAction.rename, child: Text('이름 변경')),
+                  PopupMenuItem(
+                    value: _HomeAction.rename,
+                    child: Text('이름 변경'),
+                  ),
                   PopupMenuItem(value: _HomeAction.delete, child: Text('삭제')),
                 ],
               ),
@@ -171,7 +187,10 @@ class _HomeCard extends ConsumerWidget {
   }
 
   Future<void> _onAction(
-      BuildContext context, WidgetRef ref, _HomeAction action) async {
+    BuildContext context,
+    WidgetRef ref,
+    _HomeAction action,
+  ) async {
     final repo = ref.read(homeRepositoryProvider);
     final home = summary.home;
     switch (action) {
@@ -186,11 +205,13 @@ class _HomeCard extends ConsumerWidget {
             content: Text('"${home.name}"과(와) 모든 배치안이 삭제됩니다.'),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('취소')),
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
               FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('삭제')),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('삭제'),
+              ),
             ],
           ),
         );
@@ -211,7 +232,9 @@ class _HomeCard extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
           FilledButton(
             onPressed: () {
               final v = controller.text.trim();

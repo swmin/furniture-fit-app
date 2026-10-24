@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/local/app_database.dart';
 import '../data/repositories/furniture_library_repository.dart';
 import '../data/repositories/home_repository.dart';
+import '../data/services/floor_plan_storage.dart';
 import '../domain/models/furniture_preset.dart';
 
 /// 의존성 주입 (Riverpod). 테스트에서는 [databaseProvider]를 override 한다.
@@ -12,11 +15,26 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return db;
 });
 
-final homeRepositoryProvider =
-    Provider<HomeRepository>((ref) => HomeRepository(ref.watch(databaseProvider)));
+final floorPlanStorageProvider = Provider<FloorPlanStorage>(
+  (ref) => FloorPlanStorage(),
+);
 
-final furnitureLibraryRepositoryProvider =
-    Provider<FurnitureLibraryRepository>((ref) => FurnitureLibraryRepository());
+final homeRepositoryProvider = Provider<HomeRepository>(
+  (ref) => HomeRepository(
+    ref.watch(databaseProvider),
+    storage: ref.watch(floorPlanStorageProvider),
+  ),
+);
+
+/// 도면 상대 경로 → 실제 파일.
+final floorPlanFileProvider = FutureProvider.family<File, String>(
+  (ref, relativePath) =>
+      ref.watch(floorPlanStorageProvider).resolve(relativePath),
+);
+
+final furnitureLibraryRepositoryProvider = Provider<FurnitureLibraryRepository>(
+  (ref) => FurnitureLibraryRepository(),
+);
 
 final homeSummariesProvider = StreamProvider<List<HomeSummary>>(
   (ref) => ref.watch(homeRepositoryProvider).watchHomeSummaries(),
@@ -43,5 +61,6 @@ class ProStatusNotifier extends Notifier<bool> {
   void debugSet(bool value) => state = value;
 }
 
-final proStatusProvider =
-    NotifierProvider<ProStatusNotifier, bool>(ProStatusNotifier.new);
+final proStatusProvider = NotifierProvider<ProStatusNotifier, bool>(
+  ProStatusNotifier.new,
+);

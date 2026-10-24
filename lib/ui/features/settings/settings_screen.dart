@@ -20,9 +20,11 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.workspace_premium_outlined),
             title: Text(isPro ? 'Pro 사용 중' : 'Pro 업그레이드'),
-            subtitle: Text(isPro
-                ? '모든 기능이 해제되었습니다.'
-                : '${AppConstants.proPriceLabel} · 집 무제한 · 광고 제거 · 고화질 내보내기'),
+            subtitle: Text(
+              isPro
+                  ? '모든 기능이 해제되었습니다.'
+                  : '${AppConstants.proPriceLabel} · 집 무제한 · 광고 제거 · 고화질 내보내기',
+            ),
             onTap: isPro ? null : () => showPaywallSheet(context),
           ),
           ListTile(
@@ -45,7 +47,8 @@ class SettingsScreen extends ConsumerWidget {
               secondary: const Icon(Icons.bug_report_outlined),
               title: const Text('[개발용] Pro 상태 강제 전환'),
               value: isPro,
-              onChanged: (v) => ref.read(proStatusProvider.notifier).debugSet(v),
+              onChanged: (v) =>
+                  ref.read(proStatusProvider.notifier).debugSet(v),
             ),
           ],
           const Divider(),

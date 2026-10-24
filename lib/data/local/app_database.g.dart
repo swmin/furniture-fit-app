@@ -41,6 +41,28 @@ class $HomesTable extends Homes with TableInfo<$HomesTable, Home> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _floorPlanWidthPxMeta = const VerificationMeta(
+    'floorPlanWidthPx',
+  );
+  @override
+  late final GeneratedColumn<int> floorPlanWidthPx = GeneratedColumn<int>(
+    'floor_plan_width_px',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _floorPlanHeightPxMeta = const VerificationMeta(
+    'floorPlanHeightPx',
+  );
+  @override
+  late final GeneratedColumn<int> floorPlanHeightPx = GeneratedColumn<int>(
+    'floor_plan_height_px',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _mmPerPixelMeta = const VerificationMeta(
     'mmPerPixel',
   );
@@ -112,6 +134,8 @@ class $HomesTable extends Homes with TableInfo<$HomesTable, Home> {
     id,
     name,
     floorPlanPath,
+    floorPlanWidthPx,
+    floorPlanHeightPx,
     mmPerPixel,
     calibrationJson,
     roomWidthMm,
@@ -150,6 +174,24 @@ class $HomesTable extends Homes with TableInfo<$HomesTable, Home> {
         floorPlanPath.isAcceptableOrUnknown(
           data['floor_plan_path']!,
           _floorPlanPathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('floor_plan_width_px')) {
+      context.handle(
+        _floorPlanWidthPxMeta,
+        floorPlanWidthPx.isAcceptableOrUnknown(
+          data['floor_plan_width_px']!,
+          _floorPlanWidthPxMeta,
+        ),
+      );
+    }
+    if (data.containsKey('floor_plan_height_px')) {
+      context.handle(
+        _floorPlanHeightPxMeta,
+        floorPlanHeightPx.isAcceptableOrUnknown(
+          data['floor_plan_height_px']!,
+          _floorPlanHeightPxMeta,
         ),
       );
     }
@@ -226,6 +268,14 @@ class $HomesTable extends Homes with TableInfo<$HomesTable, Home> {
         DriftSqlType.string,
         data['${effectivePrefix}floor_plan_path'],
       ),
+      floorPlanWidthPx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}floor_plan_width_px'],
+      ),
+      floorPlanHeightPx: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}floor_plan_height_px'],
+      ),
       mmPerPixel: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}mm_per_pixel'],
@@ -263,8 +313,12 @@ class Home extends DataClass implements Insertable<Home> {
   final String id;
   final String name;
 
-  /// 앱 내부 저장소에 복사된 도면 이미지 경로 (빈 방이면 null).
+  /// 앱 내부 저장소(문서 폴더) 기준 도면 이미지 상대 경로 (빈 방이면 null).
   final String? floorPlanPath;
+
+  /// 도면 이미지 픽셀 크기 (schema v2).
+  final int? floorPlanWidthPx;
+  final int? floorPlanHeightPx;
 
   /// 축척 보정 결과: 도면 이미지 1px 당 실제 mm.
   final double? mmPerPixel;
@@ -281,6 +335,8 @@ class Home extends DataClass implements Insertable<Home> {
     required this.id,
     required this.name,
     this.floorPlanPath,
+    this.floorPlanWidthPx,
+    this.floorPlanHeightPx,
     this.mmPerPixel,
     this.calibrationJson,
     this.roomWidthMm,
@@ -295,6 +351,12 @@ class Home extends DataClass implements Insertable<Home> {
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || floorPlanPath != null) {
       map['floor_plan_path'] = Variable<String>(floorPlanPath);
+    }
+    if (!nullToAbsent || floorPlanWidthPx != null) {
+      map['floor_plan_width_px'] = Variable<int>(floorPlanWidthPx);
+    }
+    if (!nullToAbsent || floorPlanHeightPx != null) {
+      map['floor_plan_height_px'] = Variable<int>(floorPlanHeightPx);
     }
     if (!nullToAbsent || mmPerPixel != null) {
       map['mm_per_pixel'] = Variable<double>(mmPerPixel);
@@ -320,6 +382,12 @@ class Home extends DataClass implements Insertable<Home> {
       floorPlanPath: floorPlanPath == null && nullToAbsent
           ? const Value.absent()
           : Value(floorPlanPath),
+      floorPlanWidthPx: floorPlanWidthPx == null && nullToAbsent
+          ? const Value.absent()
+          : Value(floorPlanWidthPx),
+      floorPlanHeightPx: floorPlanHeightPx == null && nullToAbsent
+          ? const Value.absent()
+          : Value(floorPlanHeightPx),
       mmPerPixel: mmPerPixel == null && nullToAbsent
           ? const Value.absent()
           : Value(mmPerPixel),
@@ -346,6 +414,8 @@ class Home extends DataClass implements Insertable<Home> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       floorPlanPath: serializer.fromJson<String?>(json['floorPlanPath']),
+      floorPlanWidthPx: serializer.fromJson<int?>(json['floorPlanWidthPx']),
+      floorPlanHeightPx: serializer.fromJson<int?>(json['floorPlanHeightPx']),
       mmPerPixel: serializer.fromJson<double?>(json['mmPerPixel']),
       calibrationJson: serializer.fromJson<String?>(json['calibrationJson']),
       roomWidthMm: serializer.fromJson<int?>(json['roomWidthMm']),
@@ -361,6 +431,8 @@ class Home extends DataClass implements Insertable<Home> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'floorPlanPath': serializer.toJson<String?>(floorPlanPath),
+      'floorPlanWidthPx': serializer.toJson<int?>(floorPlanWidthPx),
+      'floorPlanHeightPx': serializer.toJson<int?>(floorPlanHeightPx),
       'mmPerPixel': serializer.toJson<double?>(mmPerPixel),
       'calibrationJson': serializer.toJson<String?>(calibrationJson),
       'roomWidthMm': serializer.toJson<int?>(roomWidthMm),
@@ -374,6 +446,8 @@ class Home extends DataClass implements Insertable<Home> {
     String? id,
     String? name,
     Value<String?> floorPlanPath = const Value.absent(),
+    Value<int?> floorPlanWidthPx = const Value.absent(),
+    Value<int?> floorPlanHeightPx = const Value.absent(),
     Value<double?> mmPerPixel = const Value.absent(),
     Value<String?> calibrationJson = const Value.absent(),
     Value<int?> roomWidthMm = const Value.absent(),
@@ -386,6 +460,12 @@ class Home extends DataClass implements Insertable<Home> {
     floorPlanPath: floorPlanPath.present
         ? floorPlanPath.value
         : this.floorPlanPath,
+    floorPlanWidthPx: floorPlanWidthPx.present
+        ? floorPlanWidthPx.value
+        : this.floorPlanWidthPx,
+    floorPlanHeightPx: floorPlanHeightPx.present
+        ? floorPlanHeightPx.value
+        : this.floorPlanHeightPx,
     mmPerPixel: mmPerPixel.present ? mmPerPixel.value : this.mmPerPixel,
     calibrationJson: calibrationJson.present
         ? calibrationJson.value
@@ -402,6 +482,12 @@ class Home extends DataClass implements Insertable<Home> {
       floorPlanPath: data.floorPlanPath.present
           ? data.floorPlanPath.value
           : this.floorPlanPath,
+      floorPlanWidthPx: data.floorPlanWidthPx.present
+          ? data.floorPlanWidthPx.value
+          : this.floorPlanWidthPx,
+      floorPlanHeightPx: data.floorPlanHeightPx.present
+          ? data.floorPlanHeightPx.value
+          : this.floorPlanHeightPx,
       mmPerPixel: data.mmPerPixel.present
           ? data.mmPerPixel.value
           : this.mmPerPixel,
@@ -425,6 +511,8 @@ class Home extends DataClass implements Insertable<Home> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('floorPlanPath: $floorPlanPath, ')
+          ..write('floorPlanWidthPx: $floorPlanWidthPx, ')
+          ..write('floorPlanHeightPx: $floorPlanHeightPx, ')
           ..write('mmPerPixel: $mmPerPixel, ')
           ..write('calibrationJson: $calibrationJson, ')
           ..write('roomWidthMm: $roomWidthMm, ')
@@ -440,6 +528,8 @@ class Home extends DataClass implements Insertable<Home> {
     id,
     name,
     floorPlanPath,
+    floorPlanWidthPx,
+    floorPlanHeightPx,
     mmPerPixel,
     calibrationJson,
     roomWidthMm,
@@ -454,6 +544,8 @@ class Home extends DataClass implements Insertable<Home> {
           other.id == this.id &&
           other.name == this.name &&
           other.floorPlanPath == this.floorPlanPath &&
+          other.floorPlanWidthPx == this.floorPlanWidthPx &&
+          other.floorPlanHeightPx == this.floorPlanHeightPx &&
           other.mmPerPixel == this.mmPerPixel &&
           other.calibrationJson == this.calibrationJson &&
           other.roomWidthMm == this.roomWidthMm &&
@@ -466,6 +558,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
   final Value<String> id;
   final Value<String> name;
   final Value<String?> floorPlanPath;
+  final Value<int?> floorPlanWidthPx;
+  final Value<int?> floorPlanHeightPx;
   final Value<double?> mmPerPixel;
   final Value<String?> calibrationJson;
   final Value<int?> roomWidthMm;
@@ -477,6 +571,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.floorPlanPath = const Value.absent(),
+    this.floorPlanWidthPx = const Value.absent(),
+    this.floorPlanHeightPx = const Value.absent(),
     this.mmPerPixel = const Value.absent(),
     this.calibrationJson = const Value.absent(),
     this.roomWidthMm = const Value.absent(),
@@ -489,6 +585,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
     required String id,
     required String name,
     this.floorPlanPath = const Value.absent(),
+    this.floorPlanWidthPx = const Value.absent(),
+    this.floorPlanHeightPx = const Value.absent(),
     this.mmPerPixel = const Value.absent(),
     this.calibrationJson = const Value.absent(),
     this.roomWidthMm = const Value.absent(),
@@ -504,6 +602,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? floorPlanPath,
+    Expression<int>? floorPlanWidthPx,
+    Expression<int>? floorPlanHeightPx,
     Expression<double>? mmPerPixel,
     Expression<String>? calibrationJson,
     Expression<int>? roomWidthMm,
@@ -516,6 +616,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (floorPlanPath != null) 'floor_plan_path': floorPlanPath,
+      if (floorPlanWidthPx != null) 'floor_plan_width_px': floorPlanWidthPx,
+      if (floorPlanHeightPx != null) 'floor_plan_height_px': floorPlanHeightPx,
       if (mmPerPixel != null) 'mm_per_pixel': mmPerPixel,
       if (calibrationJson != null) 'calibration_json': calibrationJson,
       if (roomWidthMm != null) 'room_width_mm': roomWidthMm,
@@ -530,6 +632,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
     Value<String>? id,
     Value<String>? name,
     Value<String?>? floorPlanPath,
+    Value<int?>? floorPlanWidthPx,
+    Value<int?>? floorPlanHeightPx,
     Value<double?>? mmPerPixel,
     Value<String?>? calibrationJson,
     Value<int?>? roomWidthMm,
@@ -542,6 +646,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
       id: id ?? this.id,
       name: name ?? this.name,
       floorPlanPath: floorPlanPath ?? this.floorPlanPath,
+      floorPlanWidthPx: floorPlanWidthPx ?? this.floorPlanWidthPx,
+      floorPlanHeightPx: floorPlanHeightPx ?? this.floorPlanHeightPx,
       mmPerPixel: mmPerPixel ?? this.mmPerPixel,
       calibrationJson: calibrationJson ?? this.calibrationJson,
       roomWidthMm: roomWidthMm ?? this.roomWidthMm,
@@ -563,6 +669,12 @@ class HomesCompanion extends UpdateCompanion<Home> {
     }
     if (floorPlanPath.present) {
       map['floor_plan_path'] = Variable<String>(floorPlanPath.value);
+    }
+    if (floorPlanWidthPx.present) {
+      map['floor_plan_width_px'] = Variable<int>(floorPlanWidthPx.value);
+    }
+    if (floorPlanHeightPx.present) {
+      map['floor_plan_height_px'] = Variable<int>(floorPlanHeightPx.value);
     }
     if (mmPerPixel.present) {
       map['mm_per_pixel'] = Variable<double>(mmPerPixel.value);
@@ -594,6 +706,8 @@ class HomesCompanion extends UpdateCompanion<Home> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('floorPlanPath: $floorPlanPath, ')
+          ..write('floorPlanWidthPx: $floorPlanWidthPx, ')
+          ..write('floorPlanHeightPx: $floorPlanHeightPx, ')
           ..write('mmPerPixel: $mmPerPixel, ')
           ..write('calibrationJson: $calibrationJson, ')
           ..write('roomWidthMm: $roomWidthMm, ')
@@ -2450,6 +2564,8 @@ typedef $$HomesTableCreateCompanionBuilder = HomesCompanion Function({
   required String id,
   required String name,
   Value<String?> floorPlanPath,
+  Value<int?> floorPlanWidthPx,
+  Value<int?> floorPlanHeightPx,
   Value<double?> mmPerPixel,
   Value<String?> calibrationJson,
   Value<int?> roomWidthMm,
@@ -2462,6 +2578,8 @@ typedef $$HomesTableUpdateCompanionBuilder = HomesCompanion Function({
   Value<String> id,
   Value<String> name,
   Value<String?> floorPlanPath,
+  Value<int?> floorPlanWidthPx,
+  Value<int?> floorPlanHeightPx,
   Value<double?> mmPerPixel,
   Value<String?> calibrationJson,
   Value<int?> roomWidthMm,
@@ -2515,6 +2633,16 @@ class $$HomesTableFilterComposer extends Composer<_$AppDatabase, $HomesTable> {
 
   ColumnFilters<String> get floorPlanPath => $composableBuilder(
     column: $table.floorPlanPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get floorPlanWidthPx => $composableBuilder(
+    column: $table.floorPlanWidthPx,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get floorPlanHeightPx => $composableBuilder(
+    column: $table.floorPlanHeightPx,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2598,6 +2726,16 @@ class $$HomesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get floorPlanWidthPx => $composableBuilder(
+    column: $table.floorPlanWidthPx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get floorPlanHeightPx => $composableBuilder(
+    column: $table.floorPlanHeightPx,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get mmPerPixel => $composableBuilder(
     column: $table.mmPerPixel,
     builder: (column) => ColumnOrderings(column),
@@ -2646,6 +2784,16 @@ class $$HomesTableAnnotationComposer
 
   GeneratedColumn<String> get floorPlanPath => $composableBuilder(
     column: $table.floorPlanPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get floorPlanWidthPx => $composableBuilder(
+    column: $table.floorPlanWidthPx,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get floorPlanHeightPx => $composableBuilder(
+    column: $table.floorPlanHeightPx,
     builder: (column) => column,
   );
 
@@ -2732,6 +2880,8 @@ class $$HomesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> floorPlanPath = const Value.absent(),
+                Value<int?> floorPlanWidthPx = const Value.absent(),
+                Value<int?> floorPlanHeightPx = const Value.absent(),
                 Value<double?> mmPerPixel = const Value.absent(),
                 Value<String?> calibrationJson = const Value.absent(),
                 Value<int?> roomWidthMm = const Value.absent(),
@@ -2743,6 +2893,8 @@ class $$HomesTableTableManager
                 id: id,
                 name: name,
                 floorPlanPath: floorPlanPath,
+                floorPlanWidthPx: floorPlanWidthPx,
+                floorPlanHeightPx: floorPlanHeightPx,
                 mmPerPixel: mmPerPixel,
                 calibrationJson: calibrationJson,
                 roomWidthMm: roomWidthMm,
@@ -2756,6 +2908,8 @@ class $$HomesTableTableManager
                 required String id,
                 required String name,
                 Value<String?> floorPlanPath = const Value.absent(),
+                Value<int?> floorPlanWidthPx = const Value.absent(),
+                Value<int?> floorPlanHeightPx = const Value.absent(),
                 Value<double?> mmPerPixel = const Value.absent(),
                 Value<String?> calibrationJson = const Value.absent(),
                 Value<int?> roomWidthMm = const Value.absent(),
@@ -2767,6 +2921,8 @@ class $$HomesTableTableManager
                 id: id,
                 name: name,
                 floorPlanPath: floorPlanPath,
+                floorPlanWidthPx: floorPlanWidthPx,
+                floorPlanHeightPx: floorPlanHeightPx,
                 mmPerPixel: mmPerPixel,
                 calibrationJson: calibrationJson,
                 roomWidthMm: roomWidthMm,
