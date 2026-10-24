@@ -1,5 +1,4 @@
-import 'dart:math' as math;
-
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,12 +6,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers.dart';
 import '../../../core/units.dart';
 import '../../../data/local/app_database.dart';
-import '../../../domain/models/calibration.dart';
+import '../../../data/repositories/layout_repository.dart';
+import '../../../domain/geometry/placement.dart';
+import 'add_furniture_sheet.dart';
+import 'editor_canvas.dart';
+import 'furniture_form.dart';
 
 /// 배치 편집 화면.
-///
-/// Step 1: 방 렌더링(그리드·치수) + 줌/팬 + 배치안 전환/추가.
-/// Step 3에서 가구 추가·드래그·회전·간격 표시가 붙는다.
 class EditorScreen extends ConsumerStatefulWidget {
   const EditorScreen({super.key, required this.homeId});
 
@@ -23,7 +23,12 @@ class EditorScreen extends ConsumerStatefulWidget {
 }
 
 class _EditorScreenState extends ConsumerState<EditorScreen> {
+  final _canvasKey = GlobalKey<EditorCanvasState>();
   String? _selectedLayoutId;
+  String? _selectedItemId;
+  bool _showDoors = false;
+
+  LayoutRepository get _repo => ref.read(layoutRepositoryProvider);
 
   @override
   Widget build(BuildContext context) {
@@ -39,17 +44,31 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
           return const Scaffold(body: Center(child: Text('삭제된 집입니다.')));
         }
         final layoutList = layouts.value ?? const <Layout>[];
-        final selected = layoutList.isEmpty
+        final layout = layoutList.isEmpty
             ? null
             : layoutList.firstWhere(
                 (l) => l.id == _selectedLayoutId,
                 orElse: () => layoutList.first,
               );
+        final items = layout == null
+            ? const <LayoutItem>[]
+            : (ref.watch(layoutItemsProvider(layout.id)).value ??
+                  const <LayoutItem>[]);
+        final selected = items
+            .where((i) => i.id == _selectedItemId)
+            .firstOrNull;
 
         return Scaffold(
           appBar: AppBar(
             title: Text(h.name, maxLines: 1, overflow: TextOverflow.ellipsis),
             actions: [
+              IconButton(
+                tooltip: _showDoors ? '문 열림 반경 숨기기' : '문 열림 반경 모두 보기',
+                isSelected: _showDoors,
+                icon: const Icon(Icons.door_front_door_outlined),
+                selectedIcon: const Icon(Icons.door_front_door),
+                onPressed: () => setState(() => _showDoors = !_showDoors),
+              ),
               if (h.floorPlanPath != null)
                 IconButton(
                   tooltip: '축척 다시 맞추기',
@@ -61,37 +80,359 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               preferredSize: const Size.fromHeight(52),
               child: _LayoutBar(
                 layouts: layoutList,
-                selectedId: selected?.id,
-                onSelect: (id) => setState(() => _selectedLayoutId = id),
+                selectedId: layout?.id,
+                onSelect: (id) => setState(() {
+                  _selectedLayoutId = id;
+                  _selectedItemId = null;
+                }),
                 onAdd: () => _addLayout(layoutList.length + 1),
               ),
             ),
           ),
-          body: h.floorPlanPath != null
-              ? _FloorPlanCanvas(home: h)
-              : _RoomCanvas(home: h),
+          body: _body(h, layout, items),
           bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: FilledButton.tonalIcon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('가구 배치 기능은 Step 3에서 추가됩니다.')),
-                ),
-                icon: const Icon(Icons.add),
-                label: const Text('가구 추가'),
-              ),
-            ),
+            child: selected != null
+                ? _SelectionBar(
+                    item: selected,
+                    onRotate: () => _commit(
+                      selected.copyWith(
+                        rotationDeg: snapAngle(selected.rotationDeg + 90),
+                      ),
+                    ),
+                    onEdit: () => _edit(selected),
+                    onDuplicate: () async {
+                      final id = await _repo.duplicateItem(selected);
+                      setState(() => _selectedItemId = id);
+                    },
+                    onDelete: () {
+                      _repo.deleteItem(selected);
+                      setState(() => _selectedItemId = null);
+                    },
+                    onClose: () => setState(() => _selectedItemId = null),
+                    onAdd: layout == null
+                        ? null
+                        : () => _addFurniture(layout.id),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: FilledButton.icon(
+                      onPressed: layout != null && _world(h) != null
+                          ? () => _addFurniture(layout.id)
+                          : null,
+                      icon: const Icon(Icons.add),
+                      label: const Text('가구 추가'),
+                    ),
+                  ),
           ),
         );
       },
     );
   }
 
+  /// 배경 전체 영역 (mm). 도면 축척이 없으면 null.
+  Rect? _world(Home h) {
+    if (h.roomWidthMm != null && h.roomDepthMm != null) {
+      return Rect.fromLTWH(
+        0,
+        0,
+        h.roomWidthMm!.toDouble(),
+        h.roomDepthMm!.toDouble(),
+      );
+    }
+    final mpp = h.mmPerPixel;
+    if (h.floorPlanPath != null &&
+        mpp != null &&
+        h.floorPlanWidthPx != null &&
+        h.floorPlanHeightPx != null) {
+      return Rect.fromLTWH(
+        0,
+        0,
+        h.floorPlanWidthPx! * mpp,
+        h.floorPlanHeightPx! * mpp,
+      );
+    }
+    return null;
+  }
+
+  Widget _body(Home h, Layout? layout, List<LayoutItem> items) {
+    final world = _world(h);
+    if (world == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.straighten, size: 56),
+              const SizedBox(height: 16),
+              const Text(
+                '가구를 정확한 크기로 배치하려면\n먼저 도면 축척을 맞춰 주세요.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => context.push('/homes/${h.id}/calibrate'),
+                child: const Text('축척 맞추기'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final isRoom = h.roomWidthMm != null;
+    final file = h.floorPlanPath == null
+        ? null
+        : ref.watch(floorPlanFileProvider(h.floorPlanPath!)).value;
+    final report = analyzePlacement(items, room: isRoom ? world : null);
+
+    return Column(
+      children: [
+        if (report.hasIssues) _IssueStrip(report: report),
+        Expanded(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: EditorCanvas(
+                  key: _canvasKey,
+                  world: world,
+                  isRoom: isRoom,
+                  imageFile: file,
+                  items: items,
+                  selectedId: _selectedItemId,
+                  showDoors: _showDoors,
+                  onSelect: (id) => setState(() => _selectedItemId = id),
+                  onCommit: _commit,
+                ),
+              ),
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: Column(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: () => _canvasKey.currentState?.zoomBy(1.5),
+                      icon: const Icon(Icons.zoom_in),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: () => _canvasKey.currentState?.zoomBy(1 / 1.5),
+                      icon: const Icon(Icons.zoom_out),
+                    ),
+                    IconButton.filledTonal(
+                      tooltip: '화면에 맞추기',
+                      onPressed: () => _canvasKey.currentState?.fitToScreen(),
+                      icon: const Icon(Icons.fit_screen_outlined),
+                    ),
+                  ],
+                ),
+              ),
+              if (items.isEmpty)
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 12,
+                  child: Center(
+                    child: Card(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        child: Text('아래 "가구 추가"로 가구를 놓아 보세요'),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _commit(LayoutItem item) => _repo.updateItem(item);
+
   Future<void> _addLayout(int nextNumber) async {
     final id = await ref
         .read(homeRepositoryProvider)
         .createLayout(widget.homeId, '배치안 $nextNumber');
-    setState(() => _selectedLayoutId = id);
+    setState(() {
+      _selectedLayoutId = id;
+      _selectedItemId = null;
+    });
+  }
+
+  Future<void> _addFurniture(String layoutId) async {
+    final spec = await showAddFurnitureSheet(context);
+    if (spec == null || !mounted) return;
+    final c = _canvasKey.currentState?.viewportCenterWorld() ?? Offset.zero;
+    final id = await _repo.addItem(
+      layoutId: layoutId,
+      spec: spec,
+      xMm: c.dx.roundToDouble(),
+      yMm: c.dy.roundToDouble(),
+    );
+    setState(() => _selectedItemId = id);
+  }
+
+  Future<void> _edit(LayoutItem item) async {
+    final result = await showFurnitureForm(
+      context,
+      title: '가구 수정',
+      allowSaveToMine: false,
+      initial: FurnitureSpec(
+        furnitureId: item.furnitureId,
+        name: item.name,
+        widthMm: item.widthMm,
+        depthMm: item.depthMm,
+        heightMm: item.heightMm,
+        colorValue: item.colorValue,
+        doorType: item.doorType,
+        doorSwingMm: item.doorSwingMm,
+      ),
+    );
+    if (result == null) return;
+    final s = result.spec;
+    await _repo.updateItem(
+      item.copyWith(
+        name: s.name,
+        widthMm: s.widthMm,
+        depthMm: s.depthMm,
+        heightMm: Value(s.heightMm),
+        colorValue: s.colorValue,
+        doorType: Value(s.doorType),
+        doorSwingMm: Value(s.doorSwingMm),
+      ),
+    );
+  }
+}
+
+class _IssueStrip extends StatelessWidget {
+  const _IssueStrip({required this.report});
+
+  final PlacementReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final parts = [
+      if (report.overlapping.isNotEmpty) '겹침 ${report.overlapping.length}개',
+      if (report.doorBlocked.isNotEmpty)
+        '문·서랍 열림 방해 ${report.doorBlocked.length}개',
+      if (report.outOfRoom.isNotEmpty) '방 밖으로 나감 ${report.outOfRoom.length}개',
+    ];
+    return Material(
+      color: scheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: scheme.onErrorContainer,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                parts.join(' · '),
+                style: TextStyle(color: scheme.onErrorContainer),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.item,
+    required this.onRotate,
+    required this.onEdit,
+    required this.onDuplicate,
+    required this.onDelete,
+    required this.onClose,
+    required this.onAdd,
+  });
+
+  final LayoutItem item;
+  final VoidCallback onRotate;
+  final VoidCallback onEdit;
+  final VoidCallback onDuplicate;
+  final VoidCallback onDelete;
+  final VoidCallback onClose;
+  final VoidCallback? onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget action(IconData icon, String label, VoidCallback onTap) => Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon),
+              const SizedBox(height: 2),
+              Text(label, style: theme.textTheme.labelSmall),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Material(
+      elevation: 8,
+      color: theme.colorScheme.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Color(item.colorValue),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${item.name}  ·  ${formatSize(item.widthMm, item.depthMm)}  ·  ${item.rotationDeg.round()}°',
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  tooltip: '선택 해제',
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                action(Icons.rotate_90_degrees_cw_outlined, '90° 회전', onRotate),
+                action(Icons.straighten, '크기 수정', onEdit),
+                action(Icons.copy_outlined, '복제', onDuplicate),
+                action(Icons.delete_outline, '삭제', onDelete),
+                if (onAdd != null)
+                  action(Icons.add_box_outlined, '가구 추가', onAdd!),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -134,346 +475,4 @@ class _LayoutBar extends StatelessWidget {
       ),
     );
   }
-}
-
-/// 방을 mm 월드 좌표로 그리고 화면에 맞춰 축소한다.
-class _RoomCanvas extends StatelessWidget {
-  const _RoomCanvas({required this.home});
-
-  final Home home;
-
-  @override
-  Widget build(BuildContext context) {
-    final roomW = home.roomWidthMm;
-    final roomD = home.roomDepthMm;
-    if (roomW == null || roomD == null) {
-      return const Center(child: Text('도면 표시는 Step 2에서 지원됩니다.'));
-    }
-    final scheme = Theme.of(context).colorScheme;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // 여백(치수 라벨 공간)을 두고 화면에 꽉 차게 맞춘다.
-        const margin = 56.0;
-        final scale = math.min(
-          (constraints.maxWidth - margin * 2) / roomW,
-          (constraints.maxHeight - margin * 2) / roomD,
-        );
-        final canvasSize = Size(
-          roomW * scale + margin * 2,
-          roomD * scale + margin * 2,
-        );
-
-        return InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 8,
-          boundaryMargin: const EdgeInsets.all(200),
-          child: Center(
-            child: CustomPaint(
-              size: canvasSize,
-              painter: RoomPainter(
-                roomWidthMm: roomW,
-                roomDepthMm: roomD,
-                pxPerMm: scale,
-                margin: margin,
-                wallColor: scheme.onSurface,
-                gridColor: scheme.outlineVariant,
-                floorColor: scheme.surfaceContainerLowest,
-                labelColor: scheme.primary,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 도면 이미지를 배경으로 그리고, 축척이 맞춰졌으면 1m 스케일 바와 기준선을 표시한다.
-class _FloorPlanCanvas extends ConsumerWidget {
-  const _FloorPlanCanvas({required this.home});
-
-  final Home home;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final file = ref.watch(floorPlanFileProvider(home.floorPlanPath!)).value;
-    final imgW = home.floorPlanWidthPx?.toDouble();
-    final imgH = home.floorPlanHeightPx?.toDouble();
-    if (file == null || imgW == null || imgH == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final scheme = Theme.of(context).colorScheme;
-    final mmPerPixel = home.mmPerPixel;
-    final calibration = Calibration.tryParse(home.calibrationJson);
-
-    return Column(
-      children: [
-        if (mmPerPixel == null)
-          MaterialBanner(
-            backgroundColor: scheme.errorContainer,
-            content: const Text(
-              '축척이 아직 맞춰지지 않았어요. 가구를 정확히 배치하려면 먼저 축척을 맞춰 주세요.',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => context.push('/homes/${home.id}/calibrate'),
-                child: const Text('축척 맞추기'),
-              ),
-            ],
-          ),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              const margin = 16.0;
-              // fit: 화면 px / 이미지 px
-              final fit = math.min(
-                (constraints.maxWidth - margin * 2) / imgW,
-                (constraints.maxHeight - margin * 2) / imgH,
-              );
-              final size = Size(imgW * fit, imgH * fit);
-              return InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 10,
-                boundaryMargin: const EdgeInsets.all(200),
-                child: Center(
-                  child: SizedBox.fromSize(
-                    size: size,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.file(
-                          file,
-                          fit: BoxFit.fill,
-                          filterQuality: FilterQuality.medium,
-                        ),
-                        if (mmPerPixel != null)
-                          CustomPaint(
-                            painter: FloorPlanOverlayPainter(
-                              screenPxPerMm: fit / mmPerPixel,
-                              calibrationP1: calibration == null
-                                  ? null
-                                  : calibration.p1 * fit,
-                              calibrationP2: calibration == null
-                                  ? null
-                                  : calibration.p2 * fit,
-                              color: scheme.primary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 도면 위 오버레이: 좌하단 1m 스케일 바 + 축척 기준선(점선 느낌의 반투명 선).
-class FloorPlanOverlayPainter extends CustomPainter {
-  FloorPlanOverlayPainter({
-    required this.screenPxPerMm,
-    required this.calibrationP1,
-    required this.calibrationP2,
-    required this.color,
-  });
-
-  final double screenPxPerMm;
-  final Offset? calibrationP1;
-  final Offset? calibrationP2;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (calibrationP1 != null && calibrationP2 != null) {
-      canvas.drawLine(
-        calibrationP1!,
-        calibrationP2!,
-        Paint()
-          ..color = color.withValues(alpha: 0.5)
-          ..strokeWidth = 2,
-      );
-    }
-
-    // 1m 스케일 바 (너무 짧거나 길면 0.5m / 2m로 조정).
-    var barMm = 1000.0;
-    if (barMm * screenPxPerMm < 40) barMm = 2000;
-    if (barMm * screenPxPerMm > size.width * 0.5) barMm = 500;
-    final barPx = barMm * screenPxPerMm;
-    final start = Offset(12, size.height - 14);
-    final end = start + Offset(barPx, 0);
-
-    final bg = Paint()..color = Colors.white.withValues(alpha: 0.85);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTRB(start.dx - 6, start.dy - 26, end.dx + 6, start.dy + 8),
-        const Radius.circular(6),
-      ),
-      bg,
-    );
-    final bar = Paint()
-      ..color = color
-      ..strokeWidth = 3;
-    canvas.drawLine(start, end, bar);
-    canvas.drawLine(
-      start - const Offset(0, 5),
-      start + const Offset(0, 5),
-      bar,
-    );
-    canvas.drawLine(end - const Offset(0, 5), end + const Offset(0, 5), bar);
-
-    final tp = TextPainter(
-      text: TextSpan(
-        text: formatLength(barMm),
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset((start.dx + end.dx - tp.width) / 2, start.dy - 22));
-  }
-
-  @override
-  bool shouldRepaint(FloorPlanOverlayPainter old) =>
-      old.screenPxPerMm != screenPxPerMm ||
-      old.calibrationP1 != calibrationP1 ||
-      old.calibrationP2 != calibrationP2 ||
-      old.color != color;
-}
-
-/// 방 바닥·그리드(100mm/500mm)·벽·치수선을 그린다.
-class RoomPainter extends CustomPainter {
-  RoomPainter({
-    required this.roomWidthMm,
-    required this.roomDepthMm,
-    required this.pxPerMm,
-    required this.margin,
-    required this.wallColor,
-    required this.gridColor,
-    required this.floorColor,
-    required this.labelColor,
-  });
-
-  final int roomWidthMm;
-  final int roomDepthMm;
-  final double pxPerMm;
-  final double margin;
-  final Color wallColor;
-  final Color gridColor;
-  final Color floorColor;
-  final Color labelColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final room = Rect.fromLTWH(
-      margin,
-      margin,
-      roomWidthMm * pxPerMm,
-      roomDepthMm * pxPerMm,
-    );
-
-    canvas.drawRect(room, Paint()..color = floorColor);
-
-    // 그리드: 100mm 가는 선, 500mm 진한 선.
-    final fine = Paint()
-      ..color = gridColor.withValues(alpha: 0.35)
-      ..strokeWidth = 0.5;
-    final bold = Paint()
-      ..color = gridColor
-      ..strokeWidth = 1;
-    for (var x = 100; x < roomWidthMm; x += 100) {
-      final dx = room.left + x * pxPerMm;
-      canvas.drawLine(
-        Offset(dx, room.top),
-        Offset(dx, room.bottom),
-        x % 500 == 0 ? bold : fine,
-      );
-    }
-    for (var y = 100; y < roomDepthMm; y += 100) {
-      final dy = room.top + y * pxPerMm;
-      canvas.drawLine(
-        Offset(room.left, dy),
-        Offset(room.right, dy),
-        y % 500 == 0 ? bold : fine,
-      );
-    }
-
-    // 벽.
-    canvas.drawRect(
-      room,
-      Paint()
-        ..color = wallColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4,
-    );
-
-    // 치수선 (상단: 가로, 왼쪽: 세로).
-    final dim = Paint()
-      ..color = labelColor
-      ..strokeWidth = 1;
-    final topY = room.top - 24;
-    canvas.drawLine(Offset(room.left, topY), Offset(room.right, topY), dim);
-    canvas.drawLine(
-      Offset(room.left, topY - 6),
-      Offset(room.left, topY + 6),
-      dim,
-    );
-    canvas.drawLine(
-      Offset(room.right, topY - 6),
-      Offset(room.right, topY + 6),
-      dim,
-    );
-    _label(
-      canvas,
-      formatLength(roomWidthMm),
-      Offset(room.center.dx, topY - 12),
-    );
-
-    final leftX = room.left - 24;
-    canvas.drawLine(Offset(leftX, room.top), Offset(leftX, room.bottom), dim);
-    canvas.drawLine(
-      Offset(leftX - 6, room.top),
-      Offset(leftX + 6, room.top),
-      dim,
-    );
-    canvas.drawLine(
-      Offset(leftX - 6, room.bottom),
-      Offset(leftX + 6, room.bottom),
-      dim,
-    );
-    canvas.save();
-    canvas.translate(leftX - 12, room.center.dy);
-    canvas.rotate(-math.pi / 2);
-    _label(canvas, formatLength(roomDepthMm), Offset.zero);
-    canvas.restore();
-  }
-
-  void _label(Canvas canvas, String text, Offset center) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: labelColor,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
-  }
-
-  @override
-  bool shouldRepaint(RoomPainter old) =>
-      old.roomWidthMm != roomWidthMm ||
-      old.roomDepthMm != roomDepthMm ||
-      old.pxPerMm != pxPerMm ||
-      old.wallColor != wallColor;
 }

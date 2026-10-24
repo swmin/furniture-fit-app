@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/app_database.dart';
 import '../data/repositories/furniture_library_repository.dart';
 import '../data/repositories/home_repository.dart';
+import '../data/repositories/layout_repository.dart';
 import '../data/services/floor_plan_storage.dart';
 import '../domain/models/furniture_preset.dart';
 
@@ -50,6 +51,18 @@ final layoutsProvider = StreamProvider.family<List<Layout>, String>(
 
 final furniturePresetsProvider = FutureProvider<List<FurniturePreset>>(
   (ref) => ref.watch(furnitureLibraryRepositoryProvider).loadPresets(),
+);
+
+final layoutRepositoryProvider = Provider<LayoutRepository>(
+  (ref) => LayoutRepository(ref.watch(databaseProvider)),
+);
+
+final layoutItemsProvider = StreamProvider.family<List<LayoutItem>, String>(
+  (ref, layoutId) => ref.watch(layoutRepositoryProvider).watchItems(layoutId),
+);
+
+final customFurnituresProvider = StreamProvider<List<CustomFurniture>>(
+  (ref) => ref.watch(layoutRepositoryProvider).watchCustomFurnitures(),
 );
 
 /// Pro 구매 여부. Step 5(인앱 결제 연동)에서 실제 구매 상태로 교체 예정.
