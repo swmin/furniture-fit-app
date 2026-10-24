@@ -1,0 +1,276 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/providers.dart';
+import '../../../core/units.dart';
+import '../../../data/local/app_database.dart';
+
+/// 배치 편집 화면.
+///
+/// Step 1: 방 렌더링(그리드·치수) + 줌/팬 + 배치안 전환/추가.
+/// Step 3에서 가구 추가·드래그·회전·간격 표시가 붙는다.
+class EditorScreen extends ConsumerStatefulWidget {
+  const EditorScreen({super.key, required this.homeId});
+
+  final String homeId;
+
+  @override
+  ConsumerState<EditorScreen> createState() => _EditorScreenState();
+}
+
+class _EditorScreenState extends ConsumerState<EditorScreen> {
+  String? _selectedLayoutId;
+
+  @override
+  Widget build(BuildContext context) {
+    final home = ref.watch(homeProvider(widget.homeId));
+    final layouts = ref.watch(layoutsProvider(widget.homeId));
+
+    return home.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
+      data: (h) {
+        if (h == null) {
+          return const Scaffold(body: Center(child: Text('삭제된 집입니다.')));
+        }
+        final layoutList = layouts.value ?? const <Layout>[];
+        final selected = layoutList.isEmpty
+            ? null
+            : layoutList.firstWhere((l) => l.id == _selectedLayoutId,
+                orElse: () => layoutList.first);
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(h.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(52),
+              child: _LayoutBar(
+                layouts: layoutList,
+                selectedId: selected?.id,
+                onSelect: (id) => setState(() => _selectedLayoutId = id),
+                onAdd: () => _addLayout(layoutList.length + 1),
+              ),
+            ),
+          ),
+          body: _RoomCanvas(home: h),
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: FilledButton.tonalIcon(
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('가구 배치 기능은 Step 3에서 추가됩니다.')),
+                ),
+                icon: const Icon(Icons.add),
+                label: const Text('가구 추가'),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _addLayout(int nextNumber) async {
+    final id = await ref
+        .read(homeRepositoryProvider)
+        .createLayout(widget.homeId, '배치안 $nextNumber');
+    setState(() => _selectedLayoutId = id);
+  }
+}
+
+class _LayoutBar extends StatelessWidget {
+  const _LayoutBar({
+    required this.layouts,
+    required this.selectedId,
+    required this.onSelect,
+    required this.onAdd,
+  });
+
+  final List<Layout> layouts;
+  final String? selectedId;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        children: [
+          for (final l in layouts)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(l.name),
+                selected: l.id == selectedId,
+                onSelected: (_) => onSelect(l.id),
+              ),
+            ),
+          ActionChip(
+            avatar: const Icon(Icons.add, size: 18),
+            label: const Text('배치안'),
+            onPressed: onAdd,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 방을 mm 월드 좌표로 그리고 화면에 맞춰 축소한다.
+class _RoomCanvas extends StatelessWidget {
+  const _RoomCanvas({required this.home});
+
+  final Home home;
+
+  @override
+  Widget build(BuildContext context) {
+    final roomW = home.roomWidthMm;
+    final roomD = home.roomDepthMm;
+    if (roomW == null || roomD == null) {
+      return const Center(child: Text('도면 표시는 Step 2에서 지원됩니다.'));
+    }
+    final scheme = Theme.of(context).colorScheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 여백(치수 라벨 공간)을 두고 화면에 꽉 차게 맞춘다.
+        const margin = 56.0;
+        final scale = math.min(
+          (constraints.maxWidth - margin * 2) / roomW,
+          (constraints.maxHeight - margin * 2) / roomD,
+        );
+        final canvasSize = Size(
+          roomW * scale + margin * 2,
+          roomD * scale + margin * 2,
+        );
+
+        return InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 8,
+          boundaryMargin: const EdgeInsets.all(200),
+          child: Center(
+            child: CustomPaint(
+              size: canvasSize,
+              painter: RoomPainter(
+                roomWidthMm: roomW,
+                roomDepthMm: roomD,
+                pxPerMm: scale,
+                margin: margin,
+                wallColor: scheme.onSurface,
+                gridColor: scheme.outlineVariant,
+                floorColor: scheme.surfaceContainerLowest,
+                labelColor: scheme.primary,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 방 바닥·그리드(100mm/500mm)·벽·치수선을 그린다.
+class RoomPainter extends CustomPainter {
+  RoomPainter({
+    required this.roomWidthMm,
+    required this.roomDepthMm,
+    required this.pxPerMm,
+    required this.margin,
+    required this.wallColor,
+    required this.gridColor,
+    required this.floorColor,
+    required this.labelColor,
+  });
+
+  final int roomWidthMm;
+  final int roomDepthMm;
+  final double pxPerMm;
+  final double margin;
+  final Color wallColor;
+  final Color gridColor;
+  final Color floorColor;
+  final Color labelColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final room = Rect.fromLTWH(
+        margin, margin, roomWidthMm * pxPerMm, roomDepthMm * pxPerMm);
+
+    canvas.drawRect(room, Paint()..color = floorColor);
+
+    // 그리드: 100mm 가는 선, 500mm 진한 선.
+    final fine = Paint()
+      ..color = gridColor.withValues(alpha: 0.35)
+      ..strokeWidth = 0.5;
+    final bold = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+    for (var x = 100; x < roomWidthMm; x += 100) {
+      final dx = room.left + x * pxPerMm;
+      canvas.drawLine(Offset(dx, room.top), Offset(dx, room.bottom),
+          x % 500 == 0 ? bold : fine);
+    }
+    for (var y = 100; y < roomDepthMm; y += 100) {
+      final dy = room.top + y * pxPerMm;
+      canvas.drawLine(Offset(room.left, dy), Offset(room.right, dy),
+          y % 500 == 0 ? bold : fine);
+    }
+
+    // 벽.
+    canvas.drawRect(
+      room,
+      Paint()
+        ..color = wallColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
+
+    // 치수선 (상단: 가로, 왼쪽: 세로).
+    final dim = Paint()
+      ..color = labelColor
+      ..strokeWidth = 1;
+    final topY = room.top - 24;
+    canvas.drawLine(Offset(room.left, topY), Offset(room.right, topY), dim);
+    canvas.drawLine(Offset(room.left, topY - 6), Offset(room.left, topY + 6), dim);
+    canvas.drawLine(
+        Offset(room.right, topY - 6), Offset(room.right, topY + 6), dim);
+    _label(canvas, formatLength(roomWidthMm), Offset(room.center.dx, topY - 12));
+
+    final leftX = room.left - 24;
+    canvas.drawLine(Offset(leftX, room.top), Offset(leftX, room.bottom), dim);
+    canvas.drawLine(Offset(leftX - 6, room.top), Offset(leftX + 6, room.top), dim);
+    canvas.drawLine(
+        Offset(leftX - 6, room.bottom), Offset(leftX + 6, room.bottom), dim);
+    canvas.save();
+    canvas.translate(leftX - 12, room.center.dy);
+    canvas.rotate(-math.pi / 2);
+    _label(canvas, formatLength(roomDepthMm), Offset.zero);
+    canvas.restore();
+  }
+
+  void _label(Canvas canvas, String text, Offset center) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+            color: labelColor, fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(RoomPainter old) =>
+      old.roomWidthMm != roomWidthMm ||
+      old.roomDepthMm != roomDepthMm ||
+      old.pxPerMm != pxPerMm ||
+      old.wallColor != wallColor;
+}

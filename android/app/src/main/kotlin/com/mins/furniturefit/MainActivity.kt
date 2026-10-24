@@ -1,0 +1,5 @@
+package com.mins.furniturefit
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

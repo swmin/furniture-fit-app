@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "note": "국내 일반적인 대표 규격(mm). 제조사별 편차가 있으므로 출시 전 실제 제품 스펙으로 재검증 필요.",
+  "items": [
+    { "id": "bed_single", "category": "bed", "name": "싱글 침대", "widthMm": 1000, "depthMm": 2000, "heightMm": 400, "color": "#A1887F" },
+    { "id": "bed_super_single", "category": "bed", "name": "슈퍼싱글 침대", "widthMm": 1100, "depthMm": 2000, "heightMm": 400, "color": "#A1887F" },
+    { "id": "bed_queen", "category": "bed", "name": "퀸 침대", "widthMm": 1500, "depthMm": 2000, "heightMm": 400, "color": "#A1887F" },
+    { "id": "bed_king", "category": "bed", "name": "킹 침대", "widthMm": 1600, "depthMm": 2000, "heightMm": 400, "color": "#A1887F" },
+    { "id": "bed_large_king", "category": "bed", "name": "라지킹 침대", "widthMm": 1800, "depthMm": 2000, "heightMm": 400, "color": "#A1887F" },
+
+    { "id": "wardrobe_300", "category": "storage", "name": "장롱 1자 (300)", "widthMm": 300, "depthMm": 600, "heightMm": 2100, "door": { "type": "single", "swingMm": 300 }, "color": "#8D6E63" },
+    { "id": "wardrobe_600", "category": "storage", "name": "장롱 2자 (600)", "widthMm": 600, "depthMm": 600, "heightMm": 2100, "door": { "type": "double", "swingMm": 300 }, "color": "#8D6E63" },
+    { "id": "wardrobe_1200", "category": "storage", "name": "장롱 4자 (1200)", "widthMm": 1200, "depthMm": 600, "heightMm": 2100, "door": { "type": "double", "swingMm": 300 }, "color": "#8D6E63" },
+    { "id": "drawer_chest", "category": "storage", "name": "서랍장", "widthMm": 800, "depthMm": 450, "heightMm": 900, "door": { "type": "drawer", "swingMm": 400 }, "color": "#BCAAA4" },
+    { "id": "bookshelf_5", "category": "storage", "name": "5단 책장", "widthMm": 800, "depthMm": 300, "heightMm": 1800, "color": "#BCAAA4" },
+    { "id": "hanger", "category": "storage", "name": "시스템 행거", "widthMm": 1200, "depthMm": 500, "heightMm": 1800, "color": "#90A4AE" },
+
+    { "id": "desk_1200", "category": "desk", "name": "책상 1200", "widthMm": 1200, "depthMm": 600, "heightMm": 720, "color": "#D7CCC8" },
+    { "id": "desk_1400", "category": "desk", "name": "책상 1400", "widthMm": 1400, "depthMm": 700, "heightMm": 720, "color": "#D7CCC8" },
+    { "id": "desk_1600", "category": "desk", "name": "책상 1600", "widthMm": 1600, "depthMm": 800, "heightMm": 720, "color": "#D7CCC8" },
+    { "id": "chair", "category": "desk", "name": "의자", "widthMm": 600, "depthMm": 600, "heightMm": 1000, "color": "#9E9E9E" },
+
+    { "id": "sofa_2", "category": "sofa", "name": "2인 소파", "widthMm": 1500, "depthMm": 850, "heightMm": 800, "color": "#7986CB" },
+    { "id": "sofa_3", "category": "sofa", "name": "3인 소파", "widthMm": 2000, "depthMm": 900, "heightMm": 800, "color": "#7986CB" },
+    { "id": "sofa_4", "category": "sofa", "name": "4인 소파", "widthMm": 2500, "depthMm": 950, "heightMm": 800, "color": "#7986CB" },
+    { "id": "sofa_couch", "category": "sofa", "name": "카우치 소파", "widthMm": 2500, "depthMm": 1600, "heightMm": 800, "color": "#7986CB" },
+
+    { "id": "table_2", "category": "table", "name": "2인 식탁", "widthMm": 800, "depthMm": 800, "heightMm": 750, "color": "#FFCC80" },
+    { "id": "table_4", "category": "table", "name": "4인 식탁", "widthMm": 1200, "depthMm": 800, "heightMm": 750, "color": "#FFCC80" },
+    { "id": "table_6", "category": "table", "name": "6인 식탁", "widthMm": 1800, "depthMm": 900, "heightMm": 750, "color": "#FFCC80" },
+
+    { "id": "fridge_standard_4door", "category": "kitchenAppliance", "name": "냉장고 (일반 4도어)", "widthMm": 912, "depthMm": 920, "heightMm": 1850, "door": { "type": "double", "swingMm": 460 }, "color": "#B0BEC5" },
+    { "id": "fridge_kitchenfit_4door", "category": "kitchenAppliance", "name": "냉장고 (키친핏 4도어)", "widthMm": 912, "depthMm": 700, "heightMm": 1853, "door": { "type": "double", "swingMm": 460 }, "color": "#B0BEC5" },
+    { "id": "kimchi_fridge_stand", "category": "kitchenAppliance", "name": "김치냉장고 (스탠드)", "widthMm": 700, "depthMm": 800, "heightMm": 1800, "door": { "type": "single", "swingMm": 700 }, "color": "#B0BEC5" },
+
+    { "id": "washer_drum", "category": "livingAppliance", "name": "드럼세탁기", "widthMm": 690, "depthMm": 750, "heightMm": 990, "door": { "type": "single", "swingMm": 500 }, "color": "#CFD8DC" },
+    { "id": "dryer", "category": "livingAppliance", "name": "건조기", "widthMm": 690, "depthMm": 750, "heightMm": 990, "door": { "type": "single", "swingMm": 500 }, "color": "#CFD8DC" },
+    { "id": "washtower", "category": "livingAppliance", "name": "워시타워", "widthMm": 700, "depthMm": 830, "heightMm": 1890, "door": { "type": "single", "swingMm": 500 }, "color": "#CFD8DC" },
+    { "id": "aircon_stand", "category": "livingAppliance", "name": "스탠드 에어컨", "widthMm": 400, "depthMm": 400, "heightMm": 1900, "color": "#ECEFF1" },
+    { "id": "tv_65_stand", "category": "livingAppliance", "name": "TV 65\" (스탠드)", "widthMm": 1450, "depthMm": 300, "heightMm": 900, "color": "#455A64" },
+    { "id": "robot_vacuum_station", "category": "livingAppliance", "name": "로봇청소기 스테이션", "widthMm": 450, "depthMm": 450, "heightMm": 600, "color": "#ECEFF1" },
+
+    { "id": "vanity", "category": "etc", "name": "화장대", "widthMm": 800, "depthMm": 400, "heightMm": 750, "color": "#F8BBD0" },
+    { "id": "nightstand", "category": "etc", "name": "협탁", "widthMm": 450, "depthMm": 400, "heightMm": 500, "color": "#BCAAA4" },
+    { "id": "piano_upright", "category": "etc", "name": "피아노 (업라이트)", "widthMm": 1500, "depthMm": 600, "heightMm": 1250, "color": "#424242" }
+  ]
+}
