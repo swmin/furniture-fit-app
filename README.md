@@ -3,6 +3,13 @@
 > **"이 가구, 우리 집에 들어갈까? 문은 다 열릴까?"**  
 > 도면 사진 한 장(또는 방 가로×세로 치수)으로 가구·가전 배치를 **mm 단위**로 미리 시뮬레이션해 보는 2D 평면 배치 앱입니다.
 
+## 📥 Android 앱 다운로드 (APK 설치)
+
+- **[👉 최신 Android APK 바로 다운로드 (`furniturefit-v1.0.0.apk`)](https://github.com/swmin/furniture-fit-app/releases/latest/download/furniturefit-v1.0.0.apk)**
+- **[📦 전체 릴리스 및 배포 내역 보기 (Releases / Deployments)](https://github.com/swmin/furniture-fit-app/releases/latest)**
+
+> **설치 안내**: Android 스마트폰에서 위 링크로 `.apk` 파일을 다운로드한 뒤 실행하세요. 최초 설치 시 *"출처를 알 수 없는 앱 설치 허용"* 안내가 나타나면 **허용**을 누르면 바로 설치됩니다.
+
 ---
 
 ## ✨ 주요 지원 기능
